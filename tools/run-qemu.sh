@@ -221,8 +221,8 @@ if [ ${QEMU_NOGRAPHIC} == true ]; then
     elif [ ${ARCH} == "loongarch64" ]; then
       QEMU_ARGUMENT+=" -kernel ../bin/kernel/kernel.elf -append \"${KERNEL_CMDLINE}\" "
     elif [ ${ARCH} == "riscv64" ]; then
-      #QEMU_ARGUMENT+=" -append \"${KERNEL_CMDLINE}\" "
-      QEMU_ARGUMENT+=" -device loader,addr=0x80200000,file=${RISCV64_UBOOT_PATH}/u-boot.bin "
+      QEMU_ARGUMENT+=" -append \"${KERNEL_CMDLINE}\" "
+      #QEMU_ARGUMENT+=" -device loader,addr=0x80200000,file=${RISCV64_UBOOT_PATH}/u-boot.bin "
     fi
 fi
 
@@ -293,8 +293,8 @@ else
     # 如果是riscv64架构，就与efi启动一样
     install_riscv_uboot
     # echo "WJX: QEMU:${QEMU} , 1:${RISCV64_UBOOT_PATH} , 2:${QEMU_ARGUMENT}"
-    sh -c "sudo ${QEMU} -bios /home/wjx/oreboot/target/riscv64imac-unknown-none-elf/release/emulation-qemu-riscv.bin ${QEMU_ARGUMENT}"
-    #sh -c "sudo ${QEMU} -kernel ${RISCV64_UBOOT_PATH}/u-boot.bin ${QEMU_ARGUMENT}"
+    #sh -c "sudo ${QEMU} -bios /home/wjx/oreboot/target/riscv64imac-unknown-none-elf/release/emulation-qemu-riscv.bin ${QEMU_ARGUMENT}"
+    sh -c "sudo ${QEMU} -kernel ${RISCV64_UBOOT_PATH}/u-boot.bin ${QEMU_ARGUMENT}"
   elif [ ${ARCH} == loongarch64 ] ;then
     sh -c "sudo ${QEMU} ${QEMU_ARGUMENT}"
   else

@@ -735,7 +735,7 @@ impl BinaryLoader for ElfLoader {
         // debug!("ehdr = {:?}", ehdr);
 
         let binding = param.vm().clone();
-        let mut user_vm = binding.write();
+        let mut user_vm = binding.write_irqsave();
 
         // todo: 增加对user stack上的内存是否具有可执行权限的处理（方法：寻找phdr里面的PT_GNU_STACK段）
 
@@ -1033,7 +1033,7 @@ impl BinaryLoader for ElfLoader {
                 .map_err(|_| ExecError::InvalidParemeter)?;
         }
         // debug!("to create auxv");
-        let mut user_vm = binding.write();
+        let mut user_vm = binding.write_irqsave();
         self.create_auxv(param, program_entrypoint, phdr_vaddr, &ehdr)?;
 
         // debug!("auxv create ok");

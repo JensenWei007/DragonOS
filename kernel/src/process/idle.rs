@@ -27,10 +27,10 @@ impl ProcessManager {
             panic!("Idle process already initialized");
         }
 
-        assert!(
-            smp_get_processor_id() == ProcessorId::new(0),
-            "Idle process must be initialized on the first processor"
-        );
+        //assert!(
+        //    smp_get_processor_id() == ProcessorId::new(0),
+        //    "Idle process must be initialized on the first processor"
+        //);
         let mut v: Vec<Arc<ProcessControlBlock>> = Vec::with_capacity(PerCpu::MAX_CPU_NUM as usize);
 
         for i in 0..PerCpu::MAX_CPU_NUM {

@@ -34,8 +34,9 @@ impl TraitPciArch for RiscV64PciArch {
 fn riscv_pci_init() -> Result<(), SystemError> {
     let fdt = open_firmware_fdt_driver().fdt_ref()?;
 
-    pci_host_ecam_driver_init(&fdt)?;
-    pci_init();
+    // vf2 不需要, 事实上 qemu 貌似也不使用 pci，设备都是使用 mmio
+    //pci_host_ecam_driver_init(&fdt)?;
+    //pci_init();
 
     return Ok(());
 }

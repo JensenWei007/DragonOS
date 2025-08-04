@@ -20,15 +20,22 @@ use core::ptr::addr_of;
 /// console_putstr(message);
 /// ```
 pub fn console_putstr(s: &[u8]) {
-    if SbiDriver::extensions().contains(SBIExtensions::CONSOLE) {
-        for c in s {
-            sbi_rt::console_write_byte(*c);
-        }
-        return;
-    } else {
-        for c in s {
-            #[allow(deprecated)]
-            sbi_rt::legacy::console_putchar(*c as usize);
+    for &c in s {
+        match c {
+            b'\n' => {
+                #[allow(deprecated)]
+                sbi_rt::legacy::console_putchar(b'\r' as usize);
+                #[allow(deprecated)]
+                sbi_rt::legacy::console_putchar(b'\n' as usize);
+            }
+            b'\r' => {
+                #[allow(deprecated)]
+                sbi_rt::legacy::console_putchar(b'\r' as usize);
+            }
+            _ => {
+                #[allow(deprecated)]
+                sbi_rt::legacy::console_putchar(c as usize);
+            }
         }
     }
 }
