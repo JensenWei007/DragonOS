@@ -73,7 +73,10 @@ pub unsafe fn mm_init() {
             Ordering::SeqCst,
         )
         .unwrap();
+    
+    #[cfg(target_arch = "riscv64")]
     setup_arch().expect("setup_arch failed");
+
     MMArch::arch_post_init();
     info!("mm init done.");
 }
