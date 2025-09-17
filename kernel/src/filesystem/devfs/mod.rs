@@ -1,5 +1,6 @@
 /// 导出devfs的模块
 pub mod null_dev;
+pub mod urandom_dev;
 pub mod zero_dev;
 
 use super::vfs::{
@@ -23,6 +24,10 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
+use crate::register_mountable_fs;
+use crate::filesystem::vfs::{FileSystemMakerData, FSMAKER};
+use crate::filesystem::vfs::MountableFileSystem;
+use crate::filesystem::vfs::FileSystemMaker;
 use log::{error, info};
 use system_error::SystemError;
 
@@ -104,6 +109,7 @@ impl DevFS {
     /// @brief 注册系统内部自带的设备
     fn register_bultinin_device(&self) {
         use null_dev::LockedNullInode;
+        use urandom_dev::LockedUrandomInode;
         use zero_dev::LockedZeroInode;
         let dev_root: Arc<LockedDevFSInode> = self.root_inode.clone();
         dev_root
@@ -112,6 +118,15 @@ impl DevFS {
         dev_root
             .add_dev("zero", LockedZeroInode::new())
             .expect("DevFS: Failed to register /dev/zero");
+        dev_root
+            .add_dev("urandom", LockedUrandomInode::new())
+            .expect("DevFS: Failed to register /dev/urandom");
+
+        // TODO: 下面应该删除, 要实现 x86 的 port 访问驱动后, 挂载
+        #[cfg(target_arch = "x86_64")]
+        dev_root
+            .add_dev("port", LockedZeroInode::new())
+            .expect("DevFS: Failed to register /dev/urandom");
     }
 
     /// @brief 在devfs内注册设备
@@ -252,6 +267,22 @@ impl DevFS {
         }
 
         return Ok(());
+    }
+}
+
+impl MountableFileSystem for DevFS {
+    fn make_mount_data(
+        _raw_data: Option<&str>,
+        _source: &str,
+    ) -> Result<Option<Arc<dyn FileSystemMakerData + 'static>>, SystemError> {
+        // 目前devfs不需要任何额外的mount数据
+        Ok(None)
+    }
+    fn make_fs(
+        _data: Option<&dyn FileSystemMakerData>,
+    ) -> Result<Arc<dyn FileSystem + 'static>, SystemError> {
+        let fs = DevFS::new();
+        return Ok(fs);
     }
 }
 
@@ -733,3 +764,6 @@ pub fn devfs_init() -> Result<(), SystemError> {
 
     return result.unwrap();
 }
+
+// TODO: 应该改成使用 ramfs, 拓展设备功能
+register_mountable_fs!(DevFS, DEVTMPFSMAKER, "devtmpfs");

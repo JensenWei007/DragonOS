@@ -4,7 +4,9 @@ use alloc::{string::String, sync::Arc, vec::Vec};
 use log::error;
 use system_error::SystemError;
 
+use super::file_operations::FileOperations;
 use super::{FileType, IndexNode, InodeId, Metadata, SpecialNodeData};
+use crate::process::pid::PidPrivateData;
 use crate::{
     driver::{
         base::{block::SeekFrom, device::DevicePrivateData},
@@ -34,6 +36,8 @@ pub enum FilePrivateData {
     Tty(TtyFilePrivateData),
     /// epoll私有信息
     EPoll(EPollPrivateData),
+    /// pid私有信息
+    Pid(PidPrivateData),
     /// 不需要文件私有信息
     Unused,
 }
@@ -49,6 +53,20 @@ impl FilePrivateData {
         if let FilePrivateData::Pipefs(pdata) = self {
             pdata.set_mode(mode);
         }
+    }
+
+    pub fn is_pid(&self) -> bool {
+        if let FilePrivateData::Pid(_data) = self {
+            return true;
+        }
+        false
+    }
+
+    pub fn get_pid(&self) -> i32 {
+        if let FilePrivateData::Pid(data) = self {
+            return data.pid();
+        }
+        -1
     }
 }
 
@@ -159,70 +177,6 @@ impl File {
         return Ok(f);
     }
 
-    /// ## 从文件中读取指定的字节数到buffer中
-    ///
-    /// ### 参数
-    /// - `len`: 要读取的字节数
-    /// - `buf`: 缓冲区
-    /// - `read_direct`: 忽略缓存，直接读取磁盘
-    ///
-    /// ### 返回值
-    /// - `Ok(usize)`: 成功读取的字节数
-    /// - `Err(SystemError)`: 错误码
-    pub fn read(&self, len: usize, buf: &mut [u8]) -> Result<usize, SystemError> {
-        self.do_read(
-            self.offset.load(core::sync::atomic::Ordering::SeqCst),
-            len,
-            buf,
-            true,
-        )
-    }
-
-    /// ## 从buffer向文件写入指定的字节数的数据
-    ///
-    /// ### 参数
-    /// - `offset`: 文件偏移量
-    /// - `len`: 要写入的字节数
-    /// - `buf`: 写入缓冲区
-    ///
-    /// ### 返回值
-    /// - `Ok(usize)`: 成功写入的字节数
-    /// - `Err(SystemError)`: 错误码
-    pub fn write(&self, len: usize, buf: &[u8]) -> Result<usize, SystemError> {
-        self.do_write(
-            self.offset.load(core::sync::atomic::Ordering::SeqCst),
-            len,
-            buf,
-            true,
-        )
-    }
-
-    /// ## 从文件中指定的偏移处读取指定的字节数到buf中
-    ///
-    /// ### 参数
-    /// - `offset`: 文件偏移量
-    /// - `len`: 要读取的字节数
-    /// - `buf`: 读出缓冲区
-    ///
-    /// ### 返回值
-    /// - `Ok(usize)`: 成功读取的字节数
-    pub fn pread(&self, offset: usize, len: usize, buf: &mut [u8]) -> Result<usize, SystemError> {
-        self.do_read(offset, len, buf, false)
-    }
-
-    /// ## 从buf向文件中指定的偏移处写入指定的字节数的数据
-    ///
-    /// ### 参数
-    /// - `offset`: 文件偏移量
-    /// - `len`: 要写入的字节数
-    /// - `buf`: 写入缓冲区
-    ///
-    /// ### 返回值
-    /// - `Ok(usize)`: 成功写入的字节数
-    pub fn pwrite(&self, offset: usize, len: usize, buf: &[u8]) -> Result<usize, SystemError> {
-        self.do_write(offset, len, buf, false)
-    }
-
     fn do_read(
         &self,
         offset: usize,
@@ -280,22 +234,26 @@ impl File {
 
         Ok(len)
     }
+}
 
-    /// @brief 获取文件的元数据
-    pub fn metadata(&self) -> Result<Metadata, SystemError> {
-        return self.inode.metadata();
+impl FileOperations for File {
+    fn read(&self, len: usize, buf: &mut [u8]) -> Result<usize, SystemError> {
+        self.do_read(self.offset.load(Ordering::SeqCst), len, buf, true)
     }
 
-    /// @brief 根据inode号获取子目录项的名字
-    #[allow(dead_code)]
-    pub fn get_entry_name(&self, ino: InodeId) -> Result<String, SystemError> {
-        return self.inode.get_entry_name(ino);
+    fn write(&self, len: usize, buf: &[u8]) -> Result<usize, SystemError> {
+        self.do_write(self.offset.load(Ordering::SeqCst), len, buf, true)
     }
 
-    /// @brief 调整文件操作指针的位置
-    ///
-    /// @param origin 调整的起始位置
-    pub fn lseek(&self, origin: SeekFrom) -> Result<usize, SystemError> {
+    fn pread(&self, offset: usize, len: usize, buf: &mut [u8]) -> Result<usize, SystemError> {
+        self.do_read(offset, len, buf, false)
+    }
+
+    fn pwrite(&self, offset: usize, len: usize, buf: &[u8]) -> Result<usize, SystemError> {
+        self.do_write(offset, len, buf, false)
+    }
+
+    fn lseek(&self, origin: SeekFrom) -> Result<usize, SystemError> {
         let file_type = self.inode.metadata()?.file_type;
         match file_type {
             FileType::Pipe | FileType::CharDevice => {
@@ -324,33 +282,15 @@ impl File {
         return Ok(pos as usize);
     }
 
-    /// @brief 判断当前文件是否可读
-    #[inline]
-    pub fn readable(&self) -> Result<(), SystemError> {
-        // 暂时认为只要不是write only, 就可读
-        if *self.mode.read() == FileMode::O_WRONLY {
-            return Err(SystemError::EPERM);
-        }
-
-        return Ok(());
+    fn metadata(&self) -> Result<Metadata, SystemError> {
+        self.inode.metadata()
     }
 
-    /// @brief 判断当前文件是否可写
-    #[inline]
-    pub fn writeable(&self) -> Result<(), SystemError> {
-        // 暂时认为只要不是read only, 就可写
-        if *self.mode.read() == FileMode::O_RDONLY {
-            return Err(SystemError::EPERM);
-        }
-
-        return Ok(());
+    fn get_entry_name(&self, ino: InodeId) -> Result<String, SystemError> {
+        self.inode.get_entry_name(ino)
     }
 
-    /// # 读取目录项
-    ///
-    /// ## 参数
-    /// - ctx 填充目录项的上下文
-    pub fn read_dir(&self, ctx: &mut FilldirContext) -> Result<(), SystemError> {
+    fn read_dir(&self, ctx: &mut FilldirContext) -> Result<(), SystemError> {
         let inode: &Arc<dyn IndexNode> = &self.inode;
         let mut current_pos = self.offset.load(Ordering::SeqCst);
 
@@ -391,56 +331,25 @@ impl File {
         return Ok(());
     }
 
-    pub fn inode(&self) -> Arc<dyn IndexNode> {
-        return self.inode.clone();
-    }
-
-    /// @brief 尝试克隆一个文件
-    ///
-    /// @return Option<File> 克隆后的文件结构体。如果克隆失败，返回None
-    pub fn try_clone(&self) -> Option<File> {
-        let res = Self {
-            inode: self.inode.clone(),
-            offset: AtomicUsize::new(self.offset.load(Ordering::SeqCst)),
-            mode: RwLock::new(self.mode()),
-            file_type: self.file_type,
-            readdir_subdirs_name: SpinLock::new(self.readdir_subdirs_name.lock().clone()),
-            private_data: SpinLock::new(self.private_data.lock().clone()),
-            cred: self.cred.clone(),
-        };
-        // 调用inode的open方法，让inode知道有新的文件打开了这个inode
-        if self
-            .inode
-            .open(res.private_data.lock(), &res.mode())
-            .is_err()
-        {
-            return None;
+    fn readable(&self) -> Result<(), SystemError> {
+        if *self.mode.read() == FileMode::O_WRONLY {
+            return Err(SystemError::EPERM);
         }
-
-        return Some(res);
+        Ok(())
     }
 
-    /// @brief 获取文件的类型
-    #[inline]
-    pub fn file_type(&self) -> FileType {
-        return self.file_type;
+    fn writeable(&self) -> Result<(), SystemError> {
+        if *self.mode.read() == FileMode::O_RDONLY {
+            return Err(SystemError::EPERM);
+        }
+        Ok(())
     }
 
-    /// @brief 获取文件的打开模式
-    #[inline]
-    pub fn mode(&self) -> FileMode {
-        return *self.mode.read();
+    fn close_on_exec(&self) -> bool {
+        self.mode().contains(FileMode::O_CLOEXEC)
     }
 
-    /// 获取文件是否在execve时关闭
-    #[inline]
-    pub fn close_on_exec(&self) -> bool {
-        return self.mode().contains(FileMode::O_CLOEXEC);
-    }
-
-    /// 设置文件是否在execve时关闭
-    #[inline]
-    pub fn set_close_on_exec(&self, close_on_exec: bool) {
+    fn set_close_on_exec(&self, close_on_exec: bool) {
         let mut mode_guard = self.mode.write();
         if close_on_exec {
             mode_guard.insert(FileMode::O_CLOEXEC);
@@ -449,52 +358,76 @@ impl File {
         }
     }
 
-    pub fn set_mode(&self, mode: FileMode) -> Result<(), SystemError> {
-        // todo: 是否需要调用inode的open方法，以更新private data（假如它与mode有关的话）?
-        // 也许需要加个更好的设计，让inode知晓文件的打开模式发生了变化，让它自己决定是否需要更新private data
-
-        // 直接修改文件的打开模式
-        *self.mode.write() = mode;
-        self.private_data.lock().update_mode(mode);
-        return Ok(());
-    }
-
-    /// @brief 重新设置文件的大小
-    ///
-    /// 如果文件大小增加，则文件内容不变，但是文件的空洞部分会被填充为0
-    /// 如果文件大小减小，则文件内容会被截断
-    ///
-    /// @return 成功：Ok()
-    ///         失败：Err(错误码)
-    pub fn ftruncate(&self, len: usize) -> Result<(), SystemError> {
-        // 如果文件不可写，返回错误
+    fn ftruncate(&self, len: usize) -> Result<(), SystemError> {
         self.writeable()?;
-
-        // 调用inode的truncate方法
-        self.inode.resize(len)?;
-        return Ok(());
+        self.inode.resize(len)
     }
 
-    /// Add an EPollItem to the file
-    pub fn add_epitem(&self, epitem: Arc<EPollItem>) -> Result<(), SystemError> {
+    fn add_epitem(&self, epitem: Arc<EPollItem>) -> Result<(), SystemError> {
         let private_data = self.private_data.lock();
         self.inode
             .as_pollable_inode()?
             .add_epitem(epitem, &private_data)
     }
 
-    /// Remove epitems associated with the epoll
-    pub fn remove_epitem(&self, epitem: &Arc<EPollItem>) -> Result<(), SystemError> {
+    fn remove_epitem(&self, epitem: &Arc<EPollItem>) -> Result<(), SystemError> {
         let private_data = self.private_data.lock();
         self.inode
             .as_pollable_inode()?
             .remove_epitem(epitem, &private_data)
     }
 
-    /// Poll the file for events
-    pub fn poll(&self) -> Result<usize, SystemError> {
+    fn poll(&self) -> Result<usize, SystemError> {
         let private_data = self.private_data.lock();
         self.inode.as_pollable_inode()?.poll(&private_data)
+    }
+
+    fn file_type(&self) -> FileType {
+        self.file_type
+    }
+
+    fn mode(&self) -> FileMode {
+        *self.mode.read()
+    }
+
+    fn set_mode(&self, mode: FileMode) -> Result<(), SystemError> {
+        *self.mode.write() = mode;
+        self.private_data.lock().update_mode(mode);
+        Ok(())
+    }
+
+    fn try_clone(&self) -> Option<Arc<dyn FileOperations>> {
+        let cloned_file = File {
+            inode: self.inode.clone(),
+            offset: AtomicUsize::new(self.offset.load(Ordering::SeqCst)),
+            mode: RwLock::new(self.mode()),
+            file_type: self.file_type,
+            readdir_subdirs_name: SpinLock::new(self.readdir_subdirs_name.lock().clone()),
+            private_data: SpinLock::new(self.private_data.lock().clone()),
+            cred: self.cred.clone(),
+        };
+
+        if self
+            .inode
+            .open(cloned_file.private_data.lock(), &cloned_file.mode())
+            .is_err()
+        {
+            return None;
+        }
+
+        Some(Arc::new(cloned_file))
+    }
+
+    fn inode(&self) -> Arc<dyn IndexNode> {
+        self.inode.clone()
+    }
+
+    fn offset(&self) -> usize {
+        self.offset.load(Ordering::SeqCst)
+    }
+
+    fn set_offset(&self, offset: usize) {
+        self.offset.store(offset, Ordering::SeqCst);
     }
 }
 
@@ -516,9 +449,10 @@ impl Drop for File {
 /// @brief pcb里面的文件描述符数组
 #[derive(Debug)]
 pub struct FileDescriptorVec {
-    /// 当前进程打开的文件描述符
-    fds: Vec<Option<Arc<File>>>,
+    /// 当前进程打开的文件描述符（使用trait object）
+    fds: Vec<Option<Arc<dyn FileOperations>>>,
 }
+
 impl Default for FileDescriptorVec {
     fn default() -> Self {
         Self::new()
@@ -544,7 +478,7 @@ impl FileDescriptorVec {
         for i in 0..FileDescriptorVec::PROCESS_MAX_FD {
             if let Some(file) = &self.fds[i] {
                 if let Some(file) = file.try_clone() {
-                    res.fds[i] = Some(Arc::new(file));
+                    res.fds[i] = Some(file);
                 }
             }
         }
@@ -583,20 +517,23 @@ impl FileDescriptorVec {
     ///
     /// - `Ok(i32)` 申请成功，返回申请到的文件描述符
     /// - `Err(SystemError)` 申请失败，返回错误码，并且，file对象将被drop掉
-    pub fn alloc_fd(&mut self, file: File, fd: Option<i32>) -> Result<i32, SystemError> {
+    pub fn alloc_fd(
+        &mut self,
+        file: Arc<dyn FileOperations>,
+        fd: Option<i32>,
+    ) -> Result<i32, SystemError> {
         if let Some(new_fd) = fd {
             let x = &mut self.fds[new_fd as usize];
             if x.is_none() {
-                *x = Some(Arc::new(file));
+                *x = Some(file);
                 return Ok(new_fd);
             } else {
                 return Err(SystemError::EBADF);
             }
         } else {
-            // 没有指定要申请的文件描述符编号
             for i in 0..FileDescriptorVec::PROCESS_MAX_FD {
                 if self.fds[i].is_none() {
-                    self.fds[i] = Some(Arc::new(file));
+                    self.fds[i] = Some(file);
                     return Ok(i as i32);
                 }
             }
@@ -609,7 +546,7 @@ impl FileDescriptorVec {
     /// ## 参数
     ///
     /// - `fd` 文件描述符序号
-    pub fn get_file_by_fd(&self, fd: i32) -> Option<Arc<File>> {
+    pub fn get_file_by_fd(&self, fd: i32) -> Option<Arc<dyn FileOperations>> {
         if !FileDescriptorVec::validate_fd(fd) {
             return None;
         }
@@ -621,7 +558,7 @@ impl FileDescriptorVec {
     /// ## 参数
     ///
     /// - `fd` 文件描述符序号
-    pub fn drop_fd(&mut self, fd: i32) -> Result<Arc<File>, SystemError> {
+    pub fn drop_fd(&mut self, fd: i32) -> Result<Arc<dyn FileOperations>, SystemError> {
         self.get_file_by_fd(fd).ok_or(SystemError::EBADF)?;
 
         // 把文件描述符数组对应位置设置为空
@@ -673,6 +610,7 @@ impl Iterator for FileDescriptorIterator<'_> {
             let fd = self.index as i32;
             self.index += 1;
             if let Some(file) = self.fds.get_file_by_fd(fd) {
+                let file = file.downcast_arc::<File>().unwrap();
                 return Some((fd, file));
             }
         }

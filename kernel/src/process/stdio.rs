@@ -1,4 +1,5 @@
 use system_error::SystemError;
+use alloc::sync::Arc;
 
 use crate::{
     driver::tty::virtual_terminal::vc_manager,
@@ -38,7 +39,7 @@ pub fn stdio_init() -> Result<(), SystemError> {
         ProcessManager::current_pcb()
             .fd_table()
             .write()
-            .alloc_fd(stdin, None)
+            .alloc_fd(Arc::new(stdin), None)
             .unwrap(),
         0
     );
@@ -46,7 +47,7 @@ pub fn stdio_init() -> Result<(), SystemError> {
         ProcessManager::current_pcb()
             .fd_table()
             .write()
-            .alloc_fd(stdout, None)
+            .alloc_fd(Arc::new(stdout), None)
             .unwrap(),
         1
     );
@@ -54,7 +55,7 @@ pub fn stdio_init() -> Result<(), SystemError> {
         ProcessManager::current_pcb()
             .fd_table()
             .write()
-            .alloc_fd(stderr, None)
+            .alloc_fd(Arc::new(stderr), None)
             .unwrap(),
         2
     );

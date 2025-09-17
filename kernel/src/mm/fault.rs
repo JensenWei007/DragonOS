@@ -17,6 +17,7 @@ use crate::{
     },
     process::{ProcessManager, ProcessState},
 };
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 use crate::mm::MemoryManagementArch;
 

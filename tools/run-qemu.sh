@@ -287,7 +287,9 @@ if [ ${BIOS_TYPE} == uefi ] ;then
 else
   # 如果是i386架构或者x86_64架构，就直接启动
   if [ ${ARCH} == x86_64 ] || [ ${ARCH} == i386 ] ;then
+    echo "${QEMU_ARGUMENT}"
     sh -c "sudo ${QEMU} ${QEMU_ARGUMENT}"
+    #sh -c "sudo /home/wjx/qemu-7.0.0/build/qemu-system-x86_64 ${QEMU_ARGUMENT}"
   elif [ ${ARCH} == riscv64 ] ;then
     # 如果是riscv64架构，就与efi启动一样
     install_riscv_uboot

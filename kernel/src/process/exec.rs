@@ -2,6 +2,7 @@ use core::{fmt::Debug, ptr::null};
 
 use alloc::{collections::BTreeMap, ffi::CString, string::String, sync::Arc, vec::Vec};
 use system_error::SystemError;
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 use crate::{
     driver::base::block::SeekFrom,

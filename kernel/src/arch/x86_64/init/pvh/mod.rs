@@ -55,6 +55,11 @@ impl BootCallbacks for PvhBootCallback {
         Ok(())
     }
 
+    fn init_initramfs(&self) -> Result<(), SystemError> {
+        log::error!("x86 pvh, init_initramfs is not impled");
+        Ok(())
+    }
+
     fn early_init_framebuffer_info(
         &self,
         _scinfo: &mut BootTimeScreenInfo,

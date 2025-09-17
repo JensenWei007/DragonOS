@@ -52,7 +52,7 @@ impl Syscall {
         // 把socket添加到当前进程的文件描述符表中
         let binding = ProcessManager::current_pcb().fd_table();
         let mut fd_table_guard = binding.write();
-        let fd = fd_table_guard.alloc_fd(f, None).map(|x| x as usize);
+        let fd = fd_table_guard.alloc_fd(Arc::new(f), None).map(|x| x as usize);
         drop(fd_table_guard);
         return fd;
     }
@@ -91,8 +91,8 @@ impl Syscall {
                 .connect(Endpoint::Inode(Some(inode0.clone())))?;
         }
 
-        fds[0] = fd_table_guard.alloc_fd(File::new(inode0, FileMode::O_RDWR)?, None)?;
-        fds[1] = fd_table_guard.alloc_fd(File::new(inode1, FileMode::O_RDWR)?, None)?;
+        fds[0] = fd_table_guard.alloc_fd(Arc::new(File::new(inode0, FileMode::O_RDWR)?), None)?;
+        fds[1] = fd_table_guard.alloc_fd(Arc::new(File::new(inode1, FileMode::O_RDWR)?), None)?;
 
         drop(fd_table_guard);
         Ok(0)
@@ -428,7 +428,7 @@ impl Syscall {
         let new_fd = ProcessManager::current_pcb()
             .fd_table()
             .write()
-            .alloc_fd(File::new(new_socket, file_mode)?, None)?;
+            .alloc_fd(Arc::new(File::new(new_socket, file_mode)?), None)?;
         // debug!("accept: new_fd={}", new_fd);
         if !addr.is_null() {
             // debug!("accept: write remote_endpoint to user");

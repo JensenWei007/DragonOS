@@ -20,6 +20,7 @@ use crate::{
         PosixTimeSpec,
     },
 };
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 use alloc::{
     collections::LinkedList,
@@ -95,7 +96,7 @@ impl EventPoll {
         let fd_table = current_pcb.fd_table();
         let mut fd_table_guard = fd_table.write();
 
-        let fd = fd_table_guard.alloc_fd(ep_file, None)?;
+        let fd = fd_table_guard.alloc_fd(Arc::new(ep_file), None)?;
 
         Ok(fd as usize)
     }
@@ -268,6 +269,8 @@ impl EventPoll {
             .ok_or(SystemError::EBADF)?;
 
         drop(fd_table_guard);
+        let ep_file = ep_file.downcast_arc::<File>().unwrap();
+        let dst_file = dst_file.downcast_arc::<File>().unwrap();
 
         Self::do_epoll_ctl(ep_file, op, dstfd, dst_file, epds, nonblock)
     }
@@ -288,6 +291,7 @@ impl EventPoll {
 
         drop(fd_table_guard);
 
+        let dst_file = dst_file.downcast_arc::<File>().unwrap();
         Self::do_epoll_ctl(ep_file, op, dstfd, dst_file, epds, nonblock)
     }
 
@@ -307,6 +311,7 @@ impl EventPoll {
             .ok_or(SystemError::EBADF)?;
 
         drop(fd_table_guard);
+        let ep_file = ep_file.downcast_arc::<File>().unwrap();
         Self::epoll_wait_with_file(ep_file, epoll_event, max_events, timespec)
     }
     /// ## epoll_wait的具体实现

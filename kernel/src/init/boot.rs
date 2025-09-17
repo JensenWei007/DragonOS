@@ -127,6 +127,11 @@ pub trait BootCallbacks: Send + Sync {
     ///
     /// 该函数应该把内核命令行参数追加到`boot_params().boot_cmdline`中
     fn init_kernel_cmdline(&self) -> Result<(), SystemError>;
+    /// 初始化initramfs
+    ///
+    /// 该函数会检索[外部initramfs]追加到`boot_params().initramfs`中,
+    /// [外部initramfs] 指由bootloader加载的，如qemu的 -initrd 参数
+    fn init_initramfs(&self) -> Result<(), SystemError>;
     /// 初始化帧缓冲区信息
     ///
     /// - 该函数应该把帧缓冲区信息写入`scinfo`中。

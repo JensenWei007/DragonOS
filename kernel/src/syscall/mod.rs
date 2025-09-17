@@ -626,11 +626,6 @@ impl Syscall {
                 Ok(0)
             }
 
-            SYS_SIGALTSTACK => {
-                warn!("SYS_SIGALTSTACK has not yet been implemented");
-                Ok(0)
-            }
-
             SYS_SYSLOG => {
                 let syslog_action_type = args[0];
                 let buf_vaddr = args[1];

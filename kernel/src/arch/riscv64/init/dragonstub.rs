@@ -38,4 +38,9 @@ impl BootCallbacks for DragonStubCallBack {
         // parsed in `early_init_scan_memory()` and uefi driver
         Ok(())
     }
+
+    fn init_initramfs(&self) -> Result<(), SystemError> {
+        log::error!("riscv64, init_initramfs is not impled");
+        Ok(())
+    }
 }

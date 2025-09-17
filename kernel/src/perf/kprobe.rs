@@ -12,6 +12,7 @@ use crate::libs::casting::DowncastArc;
 use crate::libs::spinlock::SpinLockGuard;
 use crate::perf::util::PerfProbeArgs;
 use crate::perf::{BasicPerfEbpfCallBack, PerfEventOps};
+use crate::filesystem::vfs::file_operations::FileOperations;
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;

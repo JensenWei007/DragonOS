@@ -6,6 +6,7 @@ use core::{
 };
 
 use alloc::vec::Vec;
+use alloc::sync::Arc;
 use elf::{
     abi::{ET_DYN, ET_EXEC, PT_GNU_PROPERTY, PT_INTERP, PT_LOAD},
     endian::AnyEndian,
@@ -14,6 +15,7 @@ use elf::{
 };
 use log::error;
 use system_error::SystemError;
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 use crate::{
     arch::{CurrentElfArch, MMArch},
@@ -1028,7 +1030,7 @@ impl BinaryLoader for ElfLoader {
             ProcessManager::current_pcb()
                 .fd_table()
                 .write()
-                .alloc_fd(interpreter.file(), None)
+                .alloc_fd(Arc::new(interpreter.file()), None)
                 .map(|fd| fd as usize)
                 .map_err(|_| ExecError::InvalidParemeter)?;
         }

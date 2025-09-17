@@ -28,6 +28,11 @@ use crate::{
     time::PosixTimeSpec,
 };
 
+use crate::filesystem::vfs::FileSystemMaker;
+use crate::filesystem::vfs::MountableFileSystem;
+use crate::filesystem::vfs::{FileSystemMakerData, FSMAKER};
+use crate::register_mountable_fs;
+
 use super::vfs::{
     file::{FileMode, FilePrivateData},
     syscall::ModeType,
@@ -538,6 +543,22 @@ impl ProcFS {
     }
 }
 
+impl MountableFileSystem for ProcFS {
+    fn make_mount_data(
+        _raw_data: Option<&str>,
+        _source: &str,
+    ) -> Result<Option<Arc<dyn FileSystemMakerData + 'static>>, SystemError> {
+        // 目前procfs不需要任何额外的mount数据
+        Ok(None)
+    }
+    fn make_fs(
+        _data: Option<&dyn FileSystemMakerData>,
+    ) -> Result<Arc<dyn FileSystem + 'static>, SystemError> {
+        let fs = ProcFS::new();
+        return Ok(fs);
+    }
+}
+
 impl IndexNode for LockedProcFSInode {
     fn open(
         &self,
@@ -947,3 +968,5 @@ pub fn procfs_init() -> Result<(), SystemError> {
 
     return result.unwrap();
 }
+
+register_mountable_fs!(ProcFS, PROCFSMAKER, "proc");

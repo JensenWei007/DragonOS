@@ -13,6 +13,7 @@ use crate::mm::{
 
 use crate::syscall::table::{FormattedSyscallParam, Syscall};
 use system_error::SystemError;
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 use alloc::vec::Vec;
 

@@ -1,10 +1,14 @@
 use alloc::vec::Vec;
 use core::{intrinsics::unlikely, sync::atomic::Ordering};
 
+use crate::filesystem::vfs::file::FileMode;
+use crate::filesystem::vfs::syscall::ModeType;
+use crate::filesystem::vfs::FileType;
 use alloc::{string::ToString, sync::Arc};
 use log::error;
 use system_error::SystemError;
 
+use crate::process::pidfd::Pidfd;
 use crate::{
     arch::{interrupt::TrapFrame, ipc::signal::Signal},
     filesystem::procfs::procfs_register_pid,
@@ -405,6 +409,29 @@ impl ProcessManager {
             )?;
 
             writer.copy_one_to_user(&(pcb.pid().0 as i32), 0)?;
+        }
+
+        // 克隆 pidfd
+        if clone_flags.contains(CloneFlags::CLONE_PIDFD) {
+            let pidfd = Pidfd::new(
+                pcb.pid().data() as i32,
+                FileMode::O_RDWR | FileMode::O_CLOEXEC,
+                FileType::File,
+            )
+            .unwrap();
+            let r = current_pcb
+                .fd_table()
+                .write()
+                .alloc_fd(Arc::new(pidfd), None)
+                .map(|fd| fd as usize);
+
+            let mut writer = UserBufferWriter::new(
+                clone_args.parent_tid.data() as *mut i32,
+                core::mem::size_of::<i32>(),
+                true,
+            )?;
+
+            writer.copy_one_to_user(&(r.unwrap() as i32), 0)?;
         }
 
         sched_fork(pcb).unwrap_or_else(|e| {

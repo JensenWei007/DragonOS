@@ -16,6 +16,7 @@ use alloc::{
 use hashbrown::HashSet;
 use ida::IdAllocator;
 use system_error::SystemError;
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 use crate::{
     arch::{mm::PageMapper, CurrentIrqArch, MMArch},
@@ -394,6 +395,7 @@ impl InnerAddressSpace {
         if file.is_none() {
             return Err(SystemError::EBADF);
         }
+        let file = file.unwrap().downcast_arc::<File>().unwrap();
         // drop guard 以避免无法调度的问题
         drop(fd_table_guard);
 
@@ -417,7 +419,7 @@ impl InnerAddressSpace {
                         flags,
                         mapper,
                         flusher,
-                        file.clone(),
+                        Some(file.clone()),
                         Some(pgoff),
                     )
                 } else {
@@ -425,7 +427,7 @@ impl InnerAddressSpace {
                         VirtRegion::new(page.virt_address(), count.data() * MMArch::PAGE_SIZE),
                         vm_flags,
                         flags,
-                        file.clone(),
+                        Some(file.clone()),
                         Some(pgoff),
                         false,
                     )))
@@ -434,7 +436,6 @@ impl InnerAddressSpace {
         )?;
         // todo!(impl mmap for other file)
         // https://github.com/DragonOS-Community/DragonOS/pull/912#discussion_r1765334272
-        let file = file.unwrap();
         let _ = file.inode().mmap(start_vaddr.data(), len, offset);
         return Ok(start_page);
     }

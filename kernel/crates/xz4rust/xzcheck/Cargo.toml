@@ -1,0 +1,19 @@
+[package]
+name = "xzcheck"
+version = "0.2.1"
+edition = "2021"
+license = "MIT"
+authors = ["Alexander Schütz <aschuetz@protonmail.com>"]
+keywords = ["xz", "lzma", "compression"]
+categories = ["compression", "command-line-utilities"]
+description = "Command line utility to check if .xz are valid"
+readme = "README.md"
+
+[dependencies]
+xz4rust = "0.2.1"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+panic = "abort"

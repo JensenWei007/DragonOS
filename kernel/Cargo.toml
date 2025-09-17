@@ -80,6 +80,11 @@ printf-compat = { git = "https://git.mirrors.dragonos.org.cn/DragonOS-Community/
 
 static-keys = { version = "=0.7" }
 
+initram_macros = { path = "crates/initram_macros" }
+cpio_reader = "0.1.2"
+# 下面需求1.84.1的rustc版本，但是目前是1.84.0，换了之后其他模块会有编译问题，因此先用下面的
+xz4rust = { path = "crates/xz4rust", default-features = false, features = ["alloc"]}
+
 defer = "0.2.1"
 cfg-if = { version = "1.0.0" }
 derive_builder = { version = "0.20.2", default-features = false, features = [

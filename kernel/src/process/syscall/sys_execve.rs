@@ -10,6 +10,7 @@ use crate::process::{ProcessControlBlock, ProcessManager};
 use crate::syscall::table::{FormattedSyscallParam, Syscall};
 use crate::syscall::user_access::{check_and_clone_cstr, check_and_clone_cstr_array};
 use alloc::{ffi::CString, vec::Vec};
+use crate::alloc::string::ToString;
 use system_error::SystemError;
 
 pub struct SysExecve;
@@ -60,8 +61,15 @@ impl Syscall for SysExecve {
 
             let x = || {
                 let path: CString = check_and_clone_cstr(path, Some(MAX_PATHLEN))?;
-                let argv: Vec<CString> = check_and_clone_cstr_array(argv)?;
+                let mut argv: Vec<CString> = check_and_clone_cstr_array(argv)?;
                 let envp: Vec<CString> = check_and_clone_cstr_array(envp)?;
+
+                let real = crate::filesystem::vfs::get_link_true_file(
+                    argv[0].to_string_lossy().to_string(),
+                )
+                .unwrap();
+                argv[0] = CString::new(real).unwrap();
+
                 Ok((path, argv, envp))
             };
             let (path, argv, envp) = x().inspect_err(|e: &SystemError| {
@@ -69,6 +77,13 @@ impl Syscall for SysExecve {
             })?;
 
             let path = path.into_string().map_err(|_| SystemError::EINVAL)?;
+
+            let link = argv[0]
+                .clone()
+                .into_string()
+                .map_err(|_| SystemError::EINVAL)?;
+            let real_link = crate::filesystem::vfs::get_link_true_file(link.clone()).unwrap();
+
             ProcessManager::current_pcb()
                 .basic_mut()
                 .set_name(ProcessControlBlock::generate_name(&path, &argv));

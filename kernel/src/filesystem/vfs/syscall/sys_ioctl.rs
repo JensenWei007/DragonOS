@@ -6,6 +6,8 @@ use crate::process::ProcessManager;
 use crate::syscall::table::FormattedSyscallParam;
 use crate::syscall::table::Syscall;
 use system_error::SystemError;
+use crate::filesystem::vfs::file::File;
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -42,6 +44,7 @@ impl Syscall for SysIoctlHandle {
             .get_file_by_fd(fd as i32)
             .ok_or(SystemError::EBADF)?;
 
+        let file = file.downcast_arc::<File>().unwrap();
         // drop guard 以避免无法调度的问题
         drop(fd_table_guard);
         let r = file.inode().ioctl(cmd, data, &file.private_data.lock());

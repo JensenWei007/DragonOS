@@ -4,6 +4,7 @@ use alloc::sync::Weak;
 use core::fmt::Debug;
 use event_poll::EventPoll;
 use system_error::SystemError;
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 pub mod event_poll;
 pub mod fs;

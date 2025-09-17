@@ -18,6 +18,7 @@ use crate::{
     process::cred::GroupInfo,
     time::{syscall::PosixTimeval, PosixTimeSpec},
 };
+use crate::filesystem::vfs::file_operations::FileOperations;
 use alloc::string::String;
 
 pub(super) fn do_faccessat(
@@ -232,7 +233,7 @@ fn do_sys_openat2(
     let r = ProcessManager::current_pcb()
         .fd_table()
         .write()
-        .alloc_fd(file, None)
+        .alloc_fd(Arc::new(file), None)
         .map(|fd| fd as usize);
 
     return r;

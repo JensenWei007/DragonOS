@@ -32,6 +32,11 @@ use super::vfs::{
     vcore::generate_inode_id, FilePrivateData, FileSystem, FsInfo, IndexNode, Metadata,
 };
 
+use crate::filesystem::vfs::FileSystemMaker;
+use crate::filesystem::vfs::MountableFileSystem;
+use crate::filesystem::vfs::{FileSystemMakerData, FSMAKER};
+use crate::register_mountable_fs;
+
 const DEV_PTYFS_MAX_NAMELEN: usize = 16;
 
 #[allow(dead_code)]
@@ -86,6 +91,22 @@ impl FileSystem for DevPtsFs {
 
     fn super_block(&self) -> super::vfs::SuperBlock {
         todo!()
+    }
+}
+
+impl MountableFileSystem for DevPtsFs {
+    fn make_mount_data(
+        _raw_data: Option<&str>,
+        _source: &str,
+    ) -> Result<Option<Arc<dyn FileSystemMakerData + 'static>>, SystemError> {
+        // 目前DevPtsFs不需要任何额外的mount数据
+        Ok(None)
+    }
+    fn make_fs(
+        _data: Option<&dyn FileSystemMakerData>,
+    ) -> Result<Arc<dyn FileSystem + 'static>, SystemError> {
+        let fs = DevPtsFs::new();
+        return Ok(fs);
     }
 }
 
@@ -189,7 +210,7 @@ impl IndexNode for LockedDevPtsFSInode {
     }
 
     fn as_any_ref(&self) -> &dyn core::any::Any {
-        todo!()
+        self
     }
 
     fn list(&self) -> Result<alloc::vec::Vec<alloc::string::String>, system_error::SystemError> {
@@ -284,3 +305,5 @@ pub fn devpts_init() -> Result<(), SystemError> {
 
     Ok(())
 }
+
+register_mountable_fs!(DevPtsFs, DEVPTSFSMAKER, "devpts");

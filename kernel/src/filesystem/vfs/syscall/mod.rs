@@ -30,6 +30,7 @@ use super::{
     vcore::{do_mkdir_at, do_remove_dir, do_unlink_at},
     FileType, IndexNode, SuperBlock, MAX_PATHLEN, ROOT_INODE, VFS_MAX_FOLLOW_SYMLINK_TIMES,
 };
+use crate::filesystem::vfs::file_operations::FileOperations;
 
 mod open_utils;
 mod sys_close;
@@ -58,6 +59,8 @@ mod sys_epoll_wait;
 
 pub mod sys_mount;
 pub mod sys_umount2;
+
+pub mod sys_mknodat;
 
 pub mod symlink_utils;
 mod sys_pselect6;

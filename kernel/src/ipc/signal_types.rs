@@ -562,3 +562,22 @@ pub trait SignalArch {
 
     fn sys_rt_sigreturn(trap_frame: &mut TrapFrame) -> u64;
 }
+
+/// @brief 信号处理备用栈的信息
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+pub struct SigStack {
+    pub sp: usize,
+    pub flags: u32,
+    pub size: u32,
+}
+
+impl SigStack {
+    pub fn new() -> Self {
+        Self {
+            sp: 0,
+            flags: 0,
+            size: 0,
+        }
+    }
+}

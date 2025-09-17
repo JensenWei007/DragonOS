@@ -363,8 +363,22 @@ impl Futex {
             flags.contains(FutexFlag::FLAGS_SHARED),
             FutexAccess::FutexRead,
         )?;
+
+        // TODO: 原版本中, wake 默认必须存在于 hash, 但是 linux 中无论 wait 还是 wake, 如果 hash 中没有那么都会创建
+        // 这个地方不应该因为 hash 没有而报错
+        // 可能还有其他问题, 但是因为我目前的项目这样就跑成功了, 没有再做测试
         let mut binding = FutexData::futex_map();
-        let bucket_mut = binding.get_mut(&key).ok_or(SystemError::EINVAL)?;
+        let bucket = binding.get_mut(&key);
+        let bucket_mut = match bucket {
+            Some(bucket) => bucket,
+            None => {
+                let bucket = FutexHashBucket {
+                    chain: LinkedList::new(),
+                };
+                binding.insert(key.clone(), bucket);
+                binding.get_mut(&key).unwrap()
+            }
+        };
 
         // 确保后面的唤醒操作是有意义的
         if bucket_mut.chain.is_empty() {

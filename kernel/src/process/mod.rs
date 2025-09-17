@@ -36,7 +36,7 @@ use crate::{
     },
     ipc::{
         signal::RestartBlock,
-        signal_types::{SigInfo, SigPending, SignalStruct},
+        signal_types::{SigInfo, SigPending, SignalStruct, SigStack},
     },
     libs::{
         align::AlignedBox,
@@ -83,6 +83,7 @@ pub mod geteuid;
 pub mod idle;
 pub mod kthread;
 pub mod pid;
+pub mod pidfd;
 pub mod process_group;
 pub mod resource;
 pub mod session;
@@ -717,6 +718,8 @@ pub struct ProcessControlBlock {
     sig_info: RwLock<ProcessSignalInfo>,
     /// 信号处理结构体
     sig_struct: SpinLock<SignalStruct>,
+    /// 备用信号栈
+    sig_altstack: RwLock<SigStack>,
     /// 退出信号S
     exit_signal: AtomicSignal,
 
@@ -832,6 +835,7 @@ impl ProcessControlBlock {
                 sig_info: RwLock::new(ProcessSignalInfo::default()),
                 sig_struct: SpinLock::new(SignalStruct::new()),
                 exit_signal: AtomicSignal::new(Signal::SIGCHLD),
+                sig_altstack: RwLock::new(SigStack::new()),
                 parent_pcb: RwLock::new(ppcb.clone()),
                 real_parent_pcb: RwLock::new(ppcb),
                 children: RwLock::new(Vec::new()),
@@ -1130,6 +1134,14 @@ impl ProcessControlBlock {
         }
 
         return None;
+    }
+
+    pub fn sig_altstack(&self) -> RwLockReadGuard<SigStack> {
+        self.sig_altstack.read_irqsave()
+    }
+
+    pub fn sig_altstack_mut(&self) -> RwLockWriteGuard<SigStack> {
+        self.sig_altstack.write_irqsave()
     }
 
     /// 判断当前进程是否有未处理的信号

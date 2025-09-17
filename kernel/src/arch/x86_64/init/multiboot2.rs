@@ -96,6 +96,11 @@ impl BootCallbacks for Mb2Callback {
         Ok(())
     }
 
+    fn init_initramfs(&self) -> Result<(), SystemError> {
+        log::error!("x86 mb2, init_initramfs is not impled");
+        Ok(())
+    }
+
     fn early_init_framebuffer_info(
         &self,
         scinfo: &mut BootTimeScreenInfo,

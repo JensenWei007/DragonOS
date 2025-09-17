@@ -9,6 +9,7 @@ use system_error::SystemError;
 use crate::{
     arch::{interrupt::TrapFrame, process::arch_switch_to_user},
     driver::net::e1000e::e1000e::e1000e_init,
+    filesystem::vfs::vcore::change_root_fs,
     filesystem::vfs::vcore::mount_root_fs,
     net::net_core::net_init,
     process::{
@@ -44,7 +45,13 @@ fn kernel_init() -> Result<(), SystemError> {
         .inspect_err(|e| log::error!("ahci_init failed: {:?}", e))
         .ok();
 
-    mount_root_fs().expect("Failed to mount root fs");
+    if crate::filesystem::ramfs::initram::enable_initramfs() {
+        // 使用 initramfs, 迁移文件系统
+        change_root_fs().expect("Failed to mount root fs");
+    } else {
+        // 不使用 initramfs, 正常启动
+        mount_root_fs().expect("Failed to mount root fs");
+    }
     e1000e_init();
     net_init().unwrap_or_else(|err| {
         error!("Failed to initialize network: {:?}", err);
@@ -85,32 +92,43 @@ fn switch_to_user() -> ! {
 
     let mut trap_frame = TrapFrame::new();
 
-    if let Some(path) = kenrel_cmdline_param_manager().init_proc_path() {
-        log::info!("Boot with specified init process: {:?}", path);
+    if crate::filesystem::ramfs::initram::enable_initramfs() {
+        // 使用 initramfs, 启动 /init
+        log::info!("Initramfs, Boot with specified init process: /init");
 
-        try_to_run_init_process(
-            path.as_c_str().to_str().unwrap(),
-            &mut proc_init_info,
-            &None,
-            &mut trap_frame,
-        )
-        .unwrap_or_else(|e| {
-            panic!(
-                "Failed to run specified init process: {:?}, err: {:?}",
-                path, e
-            )
-        });
+        try_to_run_init_process("/init", &mut proc_init_info, &None, &mut trap_frame)
+            .unwrap_or_else(|e| {
+                panic!("Failed to run specified init process: /init, err: {:?}", e)
+            });
     } else {
-        let mut ok = false;
-        for (path, ext_args) in INIT_PROC_TRYLIST.iter() {
-            if try_to_run_init_process(path, &mut proc_init_info, ext_args, &mut trap_frame).is_ok()
-            {
-                ok = true;
-                break;
+        if let Some(path) = kenrel_cmdline_param_manager().init_proc_path() {
+            log::info!("Boot with specified init process: {:?}", path);
+
+            try_to_run_init_process(
+                path.as_c_str().to_str().unwrap(),
+                &mut proc_init_info,
+                &None,
+                &mut trap_frame,
+            )
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Failed to run specified init process: {:?}, err: {:?}",
+                    path, e
+                )
+            });
+        } else {
+            let mut ok = false;
+            for (path, ext_args) in INIT_PROC_TRYLIST.iter() {
+                if try_to_run_init_process(path, &mut proc_init_info, ext_args, &mut trap_frame)
+                    .is_ok()
+                {
+                    ok = true;
+                    break;
+                }
             }
-        }
-        if !ok {
-            panic!("Failed to run init process: No working init found.");
+            if !ok {
+                panic!("Failed to run init process: No working init found.");
+            }
         }
     }
     drop(proc_init_info);
