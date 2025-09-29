@@ -9,7 +9,6 @@ pub mod syscall;
 pub mod utils;
 pub mod vcore;
 
-use crate::alloc::string::ToString;
 use ::core::{any::Any, fmt::Debug, sync::atomic::AtomicUsize};
 use alloc::{string::String, sync::Arc, vec::Vec};
 use derive_builder::Builder;
@@ -1299,5 +1298,5 @@ pub fn get_link_true_file(name: String) -> Result<String, SystemError> {
         None => ROOT_INODE(),
         Some(path) => ROOT_INODE().lookup(path).unwrap(),
     };
-    Ok(parent_inode.get_nextsym(filename));
+    Ok(parent_inode.get_nextsym(filename)?)
 }

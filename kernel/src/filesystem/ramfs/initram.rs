@@ -19,7 +19,7 @@ use crate::filesystem::vfs::{syscall::ModeType, utils::rsplit_path, FileType, In
 
 static mut __INIT_ROOT_INODE: Option<Arc<dyn IndexNode>> = None;
 
-static mut __INIT_ROOT_ENABLED: bool = false;
+pub static mut __INIT_ROOT_ENABLED: bool = false;
 
 /// @brief 获取全局的 Initramfs 根节点
 #[inline(always)]
@@ -201,6 +201,4 @@ pub fn initramfs_init() -> Result<(), SystemError> {
     Ok(())
 }
 
-pub fn enable_initramfs() -> bool {
-    unsafe { __INIT_ROOT_ENABLED }
-}
+

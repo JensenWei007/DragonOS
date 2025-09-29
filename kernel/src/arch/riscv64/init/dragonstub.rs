@@ -39,6 +39,10 @@ impl BootCallbacks for DragonStubCallBack {
         Ok(())
     }
 
+    fn early_init_memmap_sysfs(&self) -> Result<(), SystemError> {
+        Ok(())
+    }
+
     fn init_initramfs(&self) -> Result<(), SystemError> {
         log::error!("riscv64, init_initramfs is not impled");
         Ok(())

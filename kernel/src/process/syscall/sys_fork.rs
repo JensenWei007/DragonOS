@@ -14,7 +14,6 @@ impl Syscall for SysFork {
     }
 
     fn handle(&self, _args: &[usize], frame: &mut TrapFrame) -> Result<usize, SystemError> {
-        log::info!("sys fork");
         ProcessManager::fork(frame, CloneFlags::empty()).map(|pid| pid.into())
     }
 

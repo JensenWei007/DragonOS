@@ -163,6 +163,7 @@ pub fn mount_root_fs() -> Result<(), SystemError> {
     return Ok(());
 }
 
+#[cfg(feature = "initram")]
 pub fn change_root_fs() -> Result<(), SystemError> {
     info!("Try to change root fs to initramfs...");
     let initramfs = crate::filesystem::ramfs::initram::INIT_ROOT_INODE().fs();

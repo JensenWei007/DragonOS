@@ -1,3 +1,4 @@
+#[cfg(feature = "initram")]
 pub mod initram;
 
 use core::any::Any;
@@ -714,4 +715,11 @@ impl IndexNode for LockedRamFSInode {
             .map(|item| item as Arc<dyn IndexNode>)
             .ok_or(SystemError::EINVAL)
     }
+}
+
+pub fn enable_initramfs() -> bool {
+    #[cfg(feature = "initram")]
+    unsafe { self::initram::__INIT_ROOT_ENABLED }
+    #[cfg(not(feature = "initram"))]
+    false
 }

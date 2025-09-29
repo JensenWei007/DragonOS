@@ -216,6 +216,36 @@ impl BootCallbacks for Mb2Callback {
 
         Ok(())
     }
+
+    fn early_init_memmap_sysfs(&self) -> Result<(), SystemError> {
+        crate::mm::sysfs::early_memmap_init();
+
+        let mb2_info = MB2_INFO.get();
+        let mem_regions_tag = mb2_info
+            .memory_map_tag()
+            .expect("MB2: Memory map tag not found!");
+
+        let mut i = 0;
+        for region in mem_regions_tag.memory_areas() {
+            let t = match MemoryAreaType::from(region.typ()) {
+                MemoryAreaType::Available => 1,
+                MemoryAreaType::Reserved => 2,
+                MemoryAreaType::AcpiAvailable => 3,
+                _ => 4,
+            };
+
+            let memmapd = crate::mm::sysfs::MemmapDesc::new(
+                i.to_string(),
+                region.start_address() as usize,
+                (region.start_address() + region.size()) as usize,
+                t,
+            );
+            crate::mm::sysfs::memmap_desc_manager().insert(i, memmapd);
+            i += 1;
+        }
+
+        Ok(())
+    }
 }
 
 impl Mb2Callback {

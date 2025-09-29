@@ -9,7 +9,6 @@ use system_error::SystemError;
 use crate::{
     arch::{interrupt::TrapFrame, process::arch_switch_to_user},
     driver::net::e1000e::e1000e::e1000e_init,
-    filesystem::vfs::vcore::change_root_fs,
     filesystem::vfs::vcore::mount_root_fs,
     net::net_core::net_init,
     process::{
@@ -18,6 +17,9 @@ use crate::{
     },
     smp::smp_init,
 };
+
+#[cfg(feature = "initram")]
+use crate::filesystem::vfs::vcore::change_root_fs;
 
 use super::{cmdline::kenrel_cmdline_param_manager, initcall::do_initcalls};
 
@@ -45,8 +47,9 @@ fn kernel_init() -> Result<(), SystemError> {
         .inspect_err(|e| log::error!("ahci_init failed: {:?}", e))
         .ok();
 
-    if crate::filesystem::ramfs::initram::enable_initramfs() {
+    if crate::filesystem::ramfs::enable_initramfs() {
         // 使用 initramfs, 迁移文件系统
+        #[cfg(feature = "initram")]
         change_root_fs().expect("Failed to mount root fs");
     } else {
         // 不使用 initramfs, 正常启动
@@ -92,7 +95,7 @@ fn switch_to_user() -> ! {
 
     let mut trap_frame = TrapFrame::new();
 
-    if crate::filesystem::ramfs::initram::enable_initramfs() {
+    if crate::filesystem::ramfs::enable_initramfs() {
         // 使用 initramfs, 启动 /init
         log::info!("Initramfs, Boot with specified init process: /init");
 

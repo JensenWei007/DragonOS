@@ -124,6 +124,41 @@ impl BootCallbacks for PvhBootCallback {
         );
         Ok(())
     }
+
+    fn early_init_memmap_sysfs(&self) -> Result<(), SystemError> {
+        crate::mm::sysfs::early_memmap_init();
+
+        let start_info = START_INFO.get();
+        if (start_info.version > 0) && start_info.memmap_entries > 0 {
+            let mut ep = unsafe {
+                MMArch::phys_2_virt(PhysAddr::new(start_info.memmap_paddr as usize)).unwrap()
+            }
+            .data() as *const HvmMemmapTableEntry;
+
+            for i in 0..start_info.memmap_entries {
+                let entry = unsafe { *ep };
+
+                let t = match E820Type::from(entry.type_) {
+                    E820Type::Ram => 1,
+                    E820Type::Reserved => 2,
+                    E820Type::Acpi => 3,
+                    _ => 4,
+                };
+
+                let memmapd = crate::mm::sysfs::MemmapDesc::new(
+                    i.to_string(),
+                    entry.addr as usize,
+                    (entry.addr + entry.size) as usize,
+                    t,
+                );
+                crate::mm::sysfs::memmap_desc_manager().insert(i as usize, memmapd);
+
+                ep = unsafe { ep.add(1) };
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[inline(never)]
